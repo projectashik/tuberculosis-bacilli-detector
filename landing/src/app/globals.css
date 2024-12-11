@@ -1,0 +1,57 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+:root {
+  --background: 240 249 255;
+  --foreground: 15 23 42;
+  --card: 248 250 252;
+  --card-foreground: 15 23 42;
+  --popover: 248 250 252;
+  --popover-foreground: 15 23 42;
+  --primary: 37 99 235;
+  --primary-foreground: 240 249 255;
+  --secondary: 191 219 254;
+  --secondary-foreground: 15 23 42;
+  --muted: 240 249 255;
+  --muted-foreground: 51 65 85;
+  --accent: 191 219 254;
+  --accent-foreground: 15 23 42;
+  --destructive: 239 68 68;
+  --destructive-foreground: 254 242 242;
+  --border: 59 130 246;
+  --input: 59 130 246;
+  --ring: 37 99 235;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 15 23 42;
+  --foreground: 240 249 255;
+  --card: 30 41 59;
+  --card-foreground: 240 249 255;
+  --popover: 30 41 59;
+  --popover-foreground: 240 249 255;
+  --primary: 59 130 246;
+  --primary-foreground: 15 23 42;
+  --secondary: 30 58 138;
+  --secondary-foreground: 240 249 255;
+  --muted: 30 41 59;
+  --muted-foreground: 148 163 184;
+  --accent: 30 58 138;
+  --accent-foreground: 240 249 255;
+  --destructive: 239 68 68;
+  --destructive-foreground: 254 242 242;
+  --border: 59 130 246;
+  --input: 59 130 246;
+  --ring: 59 130 246;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

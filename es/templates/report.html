@@ -1,0 +1,481 @@
+{% extends "base.html" %} {% block head %}
+<!-- Add Fancybox CSS -->
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css"
+/>
+{% endblock %} {% block content %}
+<div class="container mt-4">
+    <!-- Navigation buttons -->
+    <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <a href="javascript:history.back()" class="btn btn-secondary me-2">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+                <a href="{{ url_for('index') }}" class="btn btn-primary">
+                    <i class="fas fa-home"></i> Home
+                </a>
+            </div>
+            <div>
+                <button onclick="window.print()" class="btn btn-info">
+                    <i class="fas fa-download"></i> Download Report
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" id="printable-area">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>Test Report</h2>
+                <div class="no-print">
+                    <div class="btn-group me-2">
+                        {% if test.manual_status == 'pending' %}
+                            <button class="btn btn-success" onclick="verifyTest('{{ test.id }}')">Verify</button>
+                            <button class="btn btn-warning" onclick="rerunTest('{{ test.id }}')">Rerun</button>
+                            <button class="btn btn-danger" onclick="rejectTest('{{ test.id }}')">Reject</button>
+                        {% elif test.manual_status == 'verified' %}
+                            <span class="badge bg-success">Verified by Doctor</span>
+                        {% elif test.manual_status == 'rejected' %}
+                            <span class="badge bg-danger">Rejected</span>
+                        {% endif %}
+                    </div>
+                    <button class="btn btn-outline-danger" onclick="deleteTest('{{ test.id }}')">
+                        <i class="fas fa-trash"></i> Delete Test
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h4>Patient Information</h4>
+                    <p><strong>Name:</strong> {{ test.patient.name }}</p>
+                    <p><strong>Address:</strong> {{ test.patient.address }}</p>
+                    <p><strong>Contact:</strong> {{ test.patient.contact }}</p>
+                </div>
+                <div class="col-md-6">
+                    <h4>Test Information</h4>
+                    <p><strong>Test Name:</strong> <span id="test-name">{{ test.test_name }}</span></p>
+                    <p><strong>Test Date:</strong> {{ test.test_date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                    <p><strong>Pathologist:</strong> <span id="pathologist-name">{{ test.pathologist_name }}</span></p>
+                    <p><strong>Referring Doctor:</strong> <span id="referring-doctor">{{ test.referring_doctor }}</span></p>
+                    <div class="status-section">
+                        <p>
+                            <strong>AI Status:</strong>
+                            <span class="badge bg-{{ 'success' if test.ai_status == 'completed' else 'warning' }}">
+                                {{ test.ai_status.title() }}
+                            </span>
+                            <button class="btn btn-sm btn-primary ms-2" onclick="rerunAI('{{ test.id }}')">
+                                <i class="fas fa-redo"></i> Rerun AI
+                            </button>
+                        </p>
+                        <p>
+                            <strong>Doctor's Status:</strong>
+                            <span class="badge bg-{{ 'success' if test.manual_status == 'verified' else 'warning' if test.manual_status == 'pending' else 'danger' }}">
+                                {{ test.manual_status.title() }}
+                            </span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {% if test.ai_status == 'completed' %}
+            <div class="mt-4">
+                <h4>AI Analysis Results</h4>
+                <div class="row">
+                    {% set results = test.ai_results|from_json %}
+                    {% for image_result in results %}
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Sample {{ loop.index }}</h5>
+                                </div>
+                                <div class="position-relative">
+                                    <img src="/static/{{ image_result.image_path }}" class="card-img-top" alt="Sample image">
+                                    {% if image_result.result and image_result.result.status == 'success' %}
+                                        {% for prediction in image_result.result.predictions %}
+                                            <div class="detection-box" style="position: absolute; left: {{ prediction.boundingBox.left * 100 }}%; top: {{ prediction.boundingBox.top * 100 }}%; width: {{ prediction.boundingBox.width * 100 }}%; height: {{ prediction.boundingBox.height * 100 }}%; border: 2px solid {% if prediction.probability > 0.4 %}red{% else %}orange{% endif %}; border-radius: 2px; pointer-events: none;">
+                                                <div class="detection-label" style="position: absolute; top: -20px; left: 0; background: {% if prediction.probability > 0.4 %}rgba(255,0,0,0.8){% else %}rgba(255,165,0,0.8){% endif %}; color: white; padding: 2px 4px; font-size: 12px; border-radius: 2px;">
+                                                    {{ (prediction.probability * 100) | round(1) }}%
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    {% endif %}
+                                </div>
+                                <div class="card-body">
+                                    {% if image_result.result and image_result.result.status == 'success' %}
+                                        {% set max_prob = namespace(value=0) %}
+                                        {% for prediction in image_result.result.predictions %}
+                                            {% if prediction.probability > max_prob.value %}
+                                                {% set max_prob.value = prediction.probability %}
+                                            {% endif %}
+                                        {% endfor %}
+
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h5 class="mb-0">
+                                                <span class="badge {% if max_prob.value > 0.4 %}bg-danger{% else %}bg-success{% endif %}">
+                                                    {{ 'Positive' if max_prob.value > 0.4 else 'Negative' }}
+                                                </span>
+                                            </h5>
+                                            {% if image_result.result.predictions|length > 0 %}
+                                                <span class="text-muted">Max Confidence: {{ (max_prob.value * 100) | round(1) }}%</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="alert {% if max_prob.value > 0.4 %}alert-warning{% else %}alert-success{% endif %}">
+                                            {% if max_prob.value > 0.4 %}
+                                                Detected bacilli in this sample
+                                            {% else %}
+                                                No bacilli detected in this sample
+                                            {% endif %}
+                                        </div>
+                                                {% if max_prob.value > 0.4 %}
+                                                    <div class="mt-3">
+                                                        <h6>Detection Details (>40% confidence):</h6>
+                                                        <div class="table-responsive">
+                                                            <table class="table table-sm">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th>Location</th>
+                                                                        <th>Size</th>
+                                                                        <th>Confidence</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {% for prediction in image_result.result.predictions %}
+                                                                        {% if prediction.probability > 0.4 %}
+                                                                            <tr>
+                                                                                <td>({{ (prediction.boundingBox.left * 100) | round(1) }}%, {{ (prediction.boundingBox.top * 100) | round(1) }}%)</td>
+                                                                                <td>{{ (prediction.boundingBox.width * 100) | round(1) }}% x {{ (prediction.boundingBox.height * 100) | round(1) }}%</td>
+                                                                                <td>{{ (prediction.probability * 100) | round(1) }}%</td>
+                                                                            </tr>
+                                                                        {% endif %}
+                                                                    {% endfor %}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
+                                    {% else %}
+                                        <div class="alert alert-danger">
+                                            Error: {{ image_result.result.error if image_result.result and image_result.result.error else 'Unknown error processing image' }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="mt-4">
+                <h4>Doctor's Test Results</h4>
+                <div class="form-group">
+                    <textarea id="test-results" class="form-control" rows="4" {{ 'disabled' if test.manual_status == 'verified' else '' }}>{{ test.test_results or '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <h4>Remarks</h4>
+                <div class="form-group">
+                    <textarea id="remarks" class="form-control" rows="3" {{ 'disabled' if test.manual_status == 'verified' else '' }}>{{ test.remarks or '' }}</textarea>
+                </div>
+            </div>
+
+            {% if test.manual_status != 'verified' %}
+            <div class="mt-3">
+                <button class="btn btn-primary" onclick="saveChanges('{{ test.id }}')">Save Changes</button>
+            </div>
+            {% endif %}
+
+            <div class="mt-4">
+                <h4>Images</h4>
+                <div class="row" id="image-gallery">
+                    {% for image in test.images %}
+                    <div data-fancybox="gallery" data-src="{{ url_for('static', filename=image.image_path) }}" class="col-md-4 mb-3">
+                        <img src="{{ url_for('static', filename=image.image_path) }}" class="img-fluid rounded" alt="Test Image">
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function verifyTest(testId) {
+    if (!confirm('Are you sure you want to verify this test? This action cannot be undone.')) return;
+
+    fetch(`/verify_test/${testId}`, {
+        method: 'POST',
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('Test verified successfully');
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function rejectTest(testId) {
+    if (!confirm('Are you sure you want to reject this test? This will delete all test data and images.')) return;
+
+    fetch(`/reject_test/${testId}`, {
+        method: 'POST',
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('Test rejected successfully');
+            window.location.href = '/view_records';
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function rerunTest(testId) {
+    if (!confirm('Are you sure you want to rerun this test? This will delete all current images.')) return;
+
+    fetch(`/rerun_test/${testId}`, {
+        method: 'POST',
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            window.location.href = data.redirect_url;
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function saveChanges(testId) {
+    const data = {
+        test_name: document.getElementById('test-name').innerText,
+        pathologist_name: document.getElementById('pathologist-name').innerText,
+        referring_doctor: document.getElementById('referring-doctor').innerText,
+        test_results: document.getElementById('test-results').value,
+        remarks: document.getElementById('remarks').value
+    };
+
+    fetch(`/update_test/${testId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('Changes saved successfully');
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function deleteTest(testId) {
+    if (!confirm('Are you sure you want to delete this test? This action cannot be undone and will delete all test data and images.')) return;
+
+    fetch(`/delete_test/${testId}`, {
+        method: 'POST',
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('Test deleted successfully');
+            window.location.href = data.redirect_url;
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function rerunAI(testId) {
+    if (!confirm('Are you sure you want to rerun the AI analysis?')) return;
+
+    fetch(`/run_ai_inference/${testId}`, {
+        method: 'POST',
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('AI analysis completed successfully');
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Error running AI analysis: ' + error);
+    });
+}
+
+// Make text fields editable
+document.querySelectorAll('[id^="test-"], [id^="pathologist-"], [id^="referring-"]').forEach(element => {
+    if (!element.closest('.card-body').querySelector('.badge.bg-success')) {
+        element.contentEditable = true;
+        element.classList.add('editable');
+    }
+});
+</script>
+
+<style>
+.status-section {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    margin-top: 10px;
+}
+
+.editable {
+    padding: 2px 5px;
+    border-radius: 3px;
+    border: 1px dashed #ccc;
+    min-width: 50px;
+    display: inline-block;
+}
+
+.editable:focus {
+    outline: none;
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+
+/* Add Font Awesome for the delete icon */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    .container {
+        width: 100%;
+        max-width: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .card {
+        border: none;
+    }
+
+    .card-header {
+        background-color: #fff !important;
+        padding: 15px 0;
+    }
+
+    .status-section {
+        background-color: #fff !important;
+        padding: 10px 0;
+    }
+
+    /* Ensure images are properly sized */
+    .img-fluid {
+        max-width: 100%;
+        height: auto;
+        page-break-inside: avoid;
+    }
+
+    /* Add page breaks where needed */
+    .card-body > div {
+        page-break-inside: avoid;
+    }
+
+    /* Add report footer */
+    #printable-area::after {
+        content: "Generated on {{ test.test_date.strftime('%Y-%m-%d %H:%M:%S') }}";
+        display: block;
+        text-align: center;
+        font-size: 12px;
+        margin-top: 20px;
+        color: #666;
+    }
+}
+</style>
+{% endblock %} {% block extra_css %}
+<style>
+  @media print {
+    .btn {
+      display: none;
+    }
+
+    .card {
+      border: none;
+    }
+
+    .card-header {
+      background-color: #f8f9fa !important;
+      color: #000 !important;
+    }
+  }
+
+  /* Add some hover effect to the images */
+  .image-link {
+    display: block;
+    transition: transform 0.2s;
+  }
+
+  .image-link:hover {
+    transform: scale(1.05);
+  }
+
+  .img-fluid {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+</style>
+{% endblock %} {% block extra_js %}
+<!-- Add Fancybox JS -->
+<script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.umd.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    Fancybox.bind('[data-fancybox="gallery"]', {
+      dragToClose: false,
+
+      Toolbar: {
+        display: {
+          left: ["infobar"],
+          middle: [
+            "zoomIn",
+            "zoomOut",
+            "toggle1to1",
+            "rotateCCW",
+            "rotateCW",
+            "flipX",
+            "flipY",
+          ],
+          right: ["slideshow", "thumbs", "close"],
+        },
+      },
+
+      Thumbs: {
+        showOnStart: true,
+      },
+
+      Carousel: {
+        transition: "slide",
+        friction: 0.8,
+      },
+
+      Images: {
+        zoom: true,
+      },
+
+      on: {
+        load: (fancybox, slide) => {
+          console.log(`Loading image ${slide.index + 1}`)
+        },
+      },
+    })
+  })
+</script>
+{% endblock %}

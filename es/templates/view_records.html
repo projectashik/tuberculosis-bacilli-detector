@@ -1,0 +1,268 @@
+{% extends "base.html" %} {% block content %}
+<div class="container mt-4">
+    <!-- Navigation buttons -->
+    <div class="mb-3">
+        <a href="{{ url_for('index') }}" class="btn btn-primary me-2">
+            <i class="fas fa-home"></i> Home
+        </a>
+        <a href="{{ url_for('run_test') }}" class="btn btn-success me-2">
+            <i class="fas fa-vial"></i> Run New Test
+        </a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Filter Tests</h3>
+        </div>
+        <div class="card-body">
+            <form id="filterForm" method="GET" action="{{ url_for('view_records') }}">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Patient Name</label>
+                        <input type="text" class="form-control" name="patient_name" value="{{ request.args.get('patient_name', '') }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Test Name</label>
+                        <input type="text" class="form-control" name="test_name" value="{{ request.args.get('test_name', '') }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Doctor's Status</label>
+                        <select class="form-select" name="manual_status">
+                            <option value="">All</option>
+                            <option value="pending" {% if request.args.get('manual_status') == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="verified" {% if request.args.get('manual_status') == 'verified' %}selected{% endif %}>Verified</option>
+                            <option value="rejected" {% if request.args.get('manual_status') == 'rejected' %}selected{% endif %}>Rejected</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">AI Status</label>
+                        <select class="form-select" name="ai_status">
+                            <option value="">All</option>
+                            <option value="pending" {% if request.args.get('ai_status') == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="completed" {% if request.args.get('ai_status') == 'completed' %}selected{% endif %}>Completed</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Referring Doctor</label>
+                        <input type="text" class="form-control" name="referring_doctor" value="{{ request.args.get('referring_doctor', '') }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Pathologist</label>
+                        <input type="text" class="form-control" name="pathologist_name" value="{{ request.args.get('pathologist_name', '') }}">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Date From</label>
+                        <input type="date" class="form-control" name="date_from" value="{{ request.args.get('date_from', '') }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Date To</label>
+                        <input type="date" class="form-control" name="date_to" value="{{ request.args.get('date_to', '') }}">
+                    </div>
+                    <div class="col-md-4 mb-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">Apply Filters</button>
+                        <a href="{{ url_for('view_records') }}" class="btn btn-secondary">Clear Filters</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3>Test History</h3>
+            <span class="badge bg-primary">Total: {{ tests|length }}</span>
+            <a
+            href="{{ url_for('restore_from_backup') }}"
+            class="btn btn-light me-2"
+            >Restore from Backup</a
+          >
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Patient</th>
+                            <th>Test Name</th>
+                            <th>Referring Doctor</th>
+                            <th>Pathologist</th>
+                            <th>Doctor's Status</th>
+                            <th>AI Status</th>
+                            <th>Backup Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for test in tests %}
+                        <tr>
+                            <td>{{ test.test_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>{{ test.patient.name }}</td>
+                            <td>{{ test.test_name }}</td>
+                            <td>{{ test.referring_doctor }}</td>
+                            <td>{{ test.pathologist_name }}</td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if test.manual_status == 'verified' else 'warning' if test.manual_status == 'pending' else 'danger' }}">
+                                    {{ test.manual_status.title() }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if test.ai_status == 'completed' else 'warning' }}">
+                                    {{ test.ai_status.title() }}
+                                </span>
+                            </td>
+                           <td>
+                            {% if test.is_backed_up %}
+                            <span class="badge bg-success">Backed up</span>
+                            <br />
+                            <small class="text-muted"
+                              >{{ test.backup_date.strftime('%Y-%m-%d %H:%M') }}</small
+                            >
+                            {% else %}
+                            <span class="badge bg-warning">Not backed up</span>
+                            {% endif %}
+                           </td>
+
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{{ url_for('view_report', test_id=test.id) }}" class="btn btn-sm btn-primary">View</a>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteTest('{{ test.id }}')">Delete</button>
+                                    {% if not test.is_backed_up %}
+                                    <button
+                                    class="btn btn-sm btn-secondary backup-btn"
+                                    data-test-id="{{ test.id }}"
+                                  >
+                                    Backup to Azure
+                                  </button>
+                                    <button
+                                      class="btn btn-sm btn-info cloud-backup-btn"
+                                      data-test-id="{{ test.id }}"
+                                    >
+                                      Backup to Cloud
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Modal -->
+<div class="modal fade" id="resultsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Test Results</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <h6>AI Results</h6>
+                    <pre id="aiResults" class="bg-light p-3 rounded"></pre>
+                </div>
+                <div>
+                    <h6>Doctor's Results</h6>
+                    <pre id="doctorResults" class="bg-light p-3 rounded"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+  function showResults(testId) {
+      fetch(`/get_test_results/${testId}`)
+          .then(response => response.json())
+          .then(data => {
+              document.getElementById('aiResults').textContent = data.ai_results || 'No AI results available';
+              document.getElementById('doctorResults').textContent = data.test_results || 'No doctor results available';
+              new bootstrap.Modal(document.getElementById('resultsModal')).show();
+          });
+  }
+
+  function deleteTest(testId) {
+      if (!confirm('Are you sure you want to delete this test? This action cannot be undone.')) return;
+
+      fetch(`/delete_test/${testId}`, {
+          method: 'POST',
+      })
+      .then(response => response.json())
+      .then(data => {
+          if (data.status === 'success') {
+              location.reload();
+          } else {
+              alert('Error: ' + data.message);
+          }
+      });
+  }
+
+  $(document).ready(function () {
+    $(".backup-btn").click(function () {
+        const btn = $(this)
+        const testId = btn.data("test-id")
+        btn.prop("disabled", true).text("Backing up...")
+
+        $.get(`/backup_to_azure/${testId}`, function (response) {
+          if (response.status === "success") {
+            btn
+              .removeClass("btn-secondary")
+              .addClass("btn-success")
+              .text("Backed up")
+            location.reload()
+          } else {
+            btn.removeClass("btn-secondary").addClass("btn-danger").text("Failed")
+            alert("Backup failed: " + response.message)
+          }
+        }).fail(function () {
+          btn.removeClass("btn-secondary").addClass("btn-danger").text("Failed")
+          alert("Backup failed: Network error")
+        })
+      })
+
+    $(".cloud-backup-btn").click(function () {
+        const btn = $(this)
+        const testId = btn.data("test-id")
+        btn.prop("disabled", true).text("Backing up...")
+
+        $.get(`/backup_to_cloud/${testId}`, function (response) {
+          if (response.status === "success") {
+            btn.removeClass("btn-info").addClass("btn-success").text("Backed up")
+            location.reload()
+          } else {
+            btn.removeClass("btn-info").addClass("btn-danger").text("Failed")
+            alert("Cloud backup failed: " + response.message)
+          }
+        }).fail(function () {
+          btn.removeClass("btn-info").addClass("btn-danger").text("Failed")
+          alert("Cloud backup failed: Network error")
+        })
+      })
+  })
+
+  </script>
+{% endblock %}
+
+<style>
+/* Add Font Awesome for icons */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
+
+.table th {
+    white-space: nowrap;
+}
+pre {
+    white-space: pre-wrap;
+    max-height: 300px;
+    overflow-y: auto;
+}
+</style>
+{% endblock %}

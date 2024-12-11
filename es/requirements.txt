@@ -1,0 +1,10 @@
+Flask
+requests
+azure-storage-blob
+psycopg2-binary
+SQLAlchemy
+Flask-SQLAlchemy
+Flask-Migrate
+tflite-runtime
+numpy
+Pillow
