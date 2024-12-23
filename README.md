@@ -106,3 +106,23 @@ An innovative medical diagnostic tool that leverages artificial intelligence to 
 <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/raspberrypi.svg" width="50" title="Raspberry Pi" />
 
 </div>
+
+
+
+## 👥 Collaborators
+
+<div style="display: flex; flex-direction: column;">
+  <a href="https://github.com/projectashik">
+   Ashik Chapagain
+  </a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/roshankcpkr">
+   Roshan KC
+  </a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/vaskar10">
+
+
+   Vaskar
+  </a>
+</div>
